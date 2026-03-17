@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+rag_server/chroma_store/
+*.log
+*.egg-info/
+dist/
+build/
+.DS_Store
