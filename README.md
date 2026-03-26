@@ -69,7 +69,7 @@ Shows how Needoh queries LangChain documentation using our custom RAG server wit
 Demonstrates the filesystem MCP server in action, including the user confirmation flow in confirm mode.
 
 #### 3. Web Search and Implementation
-![Web Search Sequence](docs/diagrams/Sequence_Diagram_ web_search.png)
+![Web Search Sequence](docs/diagrams/Sequence_Diagram_web_search.png)
 
 Illustrates autonomous research using Tavily web search, followed by code generation based on findings.
 
