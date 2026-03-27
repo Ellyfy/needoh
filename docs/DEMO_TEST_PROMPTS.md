@@ -13,7 +13,7 @@
 
 3. **`.env`** — no PowerShell pasted inside the file. Only `KEY=value` lines and `#` comments. If you see `python-dotenv could not parse line …`, open `.env` and remove stray `@"` / `Out-File` lines.
 
-4. **Groq + tools:** Avoid `llama-3.3-70b-versatile` for tool calling — it often returns XML like `<function=...>` and Groq responds with **400 `tool_use_failed`**. `llama-3.1-70b-versatile` was **decommissioned** by Groq. The project default is **`openai/gpt-oss-20b`**. Override via `DEFAULT_GROQ_MODEL` or `--model` (e.g. `llama-3.1-8b-instant`, `openai/gpt-oss-120b`).
+4. **Groq + tools:** Default is **`openai/gpt-oss-20b`** (reliable tool JSON). **413 TPM:** shorten history, lower `NEEDOH_TOOL_OUTPUT_MAX_CHARS`, or wait. **Llama 4 Scout** can hit **tool_use_failed** (wrong tool JSON shape). Avoid `llama-3.3-70b-versatile` for fragile tool JSON. Override via `DEFAULT_GROQ_MODEL` or `--model`.
 
 5. **Run the assistant:**
 
@@ -45,14 +45,28 @@
 
 ---
 
-### 2) Custom RAG MCP (`query_langchain_docs` + HyDE)
+### 1b) Parser question + marker file (Groq-safe — use instead of editing `main.py`)
 
 **Prompt:**
 
-> Use the LangChain documentation tool only. Question: How does LangChain `bind_tools` work on a chat model, and what is the typical pattern for an agent that calls tools in a loop? Answer using retrieved doc chunks.
+> Read `main.py` and answer in chat: which CLI flag sets the LLM model name? Then use **write_file** only (not edit_file) to create `notes/video_demo.txt` with exactly two lines: line 1 is your one-sentence answer; line 2 is only `# video-demo`. Create folder `notes` first if needed.
+
+**Expect:** `read_text_file` + maybe `create_directory` + `write_file`.
+
+**Why:** Prompts like “add a comment inside `main.py`” tempt `edit_file` with huge multi-line JSON; Groq often returns **400 `Failed to parse tool call arguments as JSON`**.
+
+---
+
+### 2) Custom RAG MCP (`query_langchain_docs` + HyDE)
+
+**Prompt (quick RAG):**
+
+> Use the LangChain documentation tool only. In **three short bullet points**, what does the LangChain documentation say **Chroma** is used for as a **vector store**? Pull wording from retrieved chunks only.
 
 **Expect:** `query_langchain_docs`.  
-**Note:** First call can take **30–90+ seconds** (loads embeddings + HyDE LLM step). Later calls are faster.
+**Note:** The RAG server runs in a **separate Python process** from `main.py`, so it loads **sentence-transformers** again (ingest does not share that memory). First load in that process is often **30–90s** on CPU, then HyDE adds a short Groq call. **`RAG_WARMUP` defaults to on** so loading usually overlaps MCP startup. Set **`RAG_LOG_TIMING=true`** for `[needoh-rag timing]` on stderr. **`HYDE_ENABLED=false`** skips HyDE for a faster (weaker) demo.
+
+**If you always get “No relevant documentation” or Chroma errors:** run once from repo root: `python rag_server/ingest.py` (needs network). The vector DB is stored under `rag_server/chroma_store/` by default (same path the MCP server uses even if your cwd changes).
 
 ---
 
@@ -79,13 +93,14 @@
 
 ## B. Two non-trivial tasks (strong video material)
 
-### Task 1 — Read → edit → verify (filesystem + shell)
+### Task 1 — Read → write full file → verify (filesystem + shell)
 
 **Prompt:**
 
-> Open `agent/loop.py`, add a new comment line directly under the module docstring that says `# demo: <today's date>`, then run `python -m py_compile agent/loop.py` and tell me if it succeeded.
+> Read `agent/loop.py`. Add a new line directly under the module docstring that says `# demo: <today's date>`. Use **write_file** with the **entire** updated file contents (do not use edit_file). Then run `python -m py_compile agent/loop.py` and say if it succeeded.
 
-**Expect:** filesystem read + `edit_file` or `write_file`, then `run_shell_command`.
+**Expect:** read + `write_file` + `run_shell_command`.  
+**Tip:** If the model still tries `edit_file` and Groq errors, say explicitly: “Use write_file only with the complete file.”
 
 ---
 

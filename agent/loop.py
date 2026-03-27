@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from typing import Any
 
@@ -35,6 +36,10 @@ from ui.display import (
 )
 
 MAX_ITERATIONS = 30
+
+# Groq TPM: large tool results in history inflate every request. Truncate ToolMessage bodies
+# sent to the LLM (full text is still shown in the REPL when the tool returns).
+_DEFAULT_TOOL_MSG_CAP = 10000
 
 _TOOL_NAME_ALIASES = {
     "tavily_search": "tavily-search",
@@ -65,8 +70,11 @@ Your job:
 - Report clearly when the task is done
 
 Guidelines:
+- Tool calls must match each tool's schema (e.g. write_file: {"path": "...", "content": "..."}). Never use a wrapper key named "parameters"; never use XML-style tool tags.
 - Always read a file before editing it
 - Prefer small, focused tool calls over large ones
+- Do not use edit_file when oldText or newText would span more than a single line; use write_file with the full file body instead (Groq often rejects large edit_file JSON)
+- For tiny one-line inserts in an already-read file, a minimal edit_file is OK only if oldText and newText are each one line
 - If you are unsure about scope, ask ONE clarifying question
 - Use query_langchain_docs only for LangChain / LCEL / agent API questions—not for general programming trivia
 - Use tavily-search for current web information; use tavily-extract to read a specific URL
@@ -115,6 +123,35 @@ class AgentLoop:
     def clear_history(self) -> None:
         self.history = [SystemMessage(content=SYSTEM_PROMPT)]
 
+    def _messages_for_llm(self) -> list[BaseMessage]:
+        """Shrink history for the API: long tool outputs cause 413 TPM errors on Groq."""
+        cap = int(os.getenv("NEEDOH_TOOL_OUTPUT_MAX_CHARS", str(_DEFAULT_TOOL_MSG_CAP)))
+        if cap <= 0:
+            return list(self.history)
+        out: list[BaseMessage] = []
+        for m in self.history:
+            if not isinstance(m, ToolMessage):
+                out.append(m)
+                continue
+            text = m.content if isinstance(m.content, str) else str(m.content)
+            if len(text) <= cap:
+                out.append(m)
+                continue
+            reserve = 160
+            cut = max(0, cap - reserve)
+            lost = len(text) - cut
+            note = (
+                f"\n\n...[truncated {lost} chars for LLM context; "
+                "raise NEEDOH_TOOL_OUTPUT_MAX_CHARS or clear history with /clear if needed]"
+            )
+            out.append(
+                ToolMessage(
+                    content=text[:cut] + note,
+                    tool_call_id=m.tool_call_id,
+                )
+            )
+        return out
+
     async def _emit_assistant_text(self, text: str) -> None:
         """Print assistant text in small chunks for a streaming-style REPL."""
         if not text:
@@ -135,7 +172,7 @@ class AgentLoop:
         llm = self.provider.get_llm(tools=self._tools)
 
         def _invoke():
-            return llm.invoke(self.history)
+            return llm.invoke(self._messages_for_llm())
 
         try:
             response = await loop.run_in_executor(None, _invoke)
@@ -149,10 +186,27 @@ class AgentLoop:
                     " That Groq model was retired. Set DEFAULT_GROQ_MODEL to a current id "
                     "(see https://console.groq.com/docs/deprecations), e.g. openai/gpt-oss-20b."
                 )
-            elif "Failed to call a function" in err_s or "tool_use_failed" in err_s.lower():
+            elif (
+                "rate_limit_exceeded" in err_s.lower()
+                or "tokens per minute" in err_s.lower()
+                or "error code: 413" in err_s.lower()
+            ):
                 hint = (
-                    " Groq tool calling failed (e.g. llama-3.3-70b-versatile XML tools). "
-                    "Try openai/gpt-oss-20b or llama-3.1-8b-instant: DEFAULT_GROQ_MODEL or /model."
+                    " Groq on_demand TPM: the request is too large for this model's per-minute cap. "
+                    "Lower NEEDOH_TOOL_OUTPUT_MAX_CHARS (tool results in history are truncated), "
+                    "start a fresh session, wait ~60s, or try a higher-TPM model (may break tools)."
+                )
+            elif (
+                "tool_use_failed" in err_s.lower()
+                or "failed_generation" in err_s.lower()
+                or "parse tool call arguments" in err_s.lower()
+                or "validation failed" in err_s.lower()
+            ):
+                hint = (
+                    " Groq rejected the tool call format (wrong JSON shape, e.g. 'parameters' "
+                    "instead of tool args, or XML). Default model is openai/gpt-oss-20b for reliable "
+                    "tools; meta-llama/llama-4-scout-17b-16e-instruct often triggers this. "
+                    "Retry or set DEFAULT_GROQ_MODEL=openai/gpt-oss-20b."
                 )
             return AIMessage(
                 content=f"[needoh] Model call failed: {exc}{hint}",
@@ -225,7 +279,13 @@ class AgentLoop:
             else:
                 print_tool_call(name, args)
 
-            with SpinnerContext(f"Running {name}…"):
+            spin_msg = f"Running {name}…"
+            if name == "query_langchain_docs":
+                spin_msg = (
+                    "Running query_langchain_docs… "
+                    "(first call loads local embeddings — may take 30–90s)"
+                )
+            with SpinnerContext(spin_msg):
                 try:
                     if name == "run_shell_command":
                         result = await self._shell.run(
@@ -234,6 +294,24 @@ class AgentLoop:
                         )
                     elif name == "change_directory":
                         result = self._shell.change_dir(args.get("path", "."))
+                    elif name == "query_langchain_docs":
+                        q = args.get("query", "")
+                        rag_args = {
+                            "query": q.strip() if isinstance(q, str) else "",
+                        }
+                        sec = float(os.getenv("RAG_CLIENT_TIMEOUT_SEC", "180"))
+                        try:
+                            result = await asyncio.wait_for(
+                                self.mcp.call_tool(name, rag_args),
+                                timeout=sec,
+                            )
+                        except asyncio.TimeoutError:
+                            result = (
+                                f"ERROR: query_langchain_docs exceeded {sec:.0f}s "
+                                f"(RAG_CLIENT_TIMEOUT_SEC). The RAG subprocess may be "
+                                "loading the embedding model or stuck; check terminal "
+                                "stderr for [needoh-rag] lines."
+                            )
                     else:
                         result = await self.mcp.call_tool(name, args)
                 except Exception as exc:

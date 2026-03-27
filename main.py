@@ -213,7 +213,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default=None,
-        help="Model name override (e.g. openai/gpt-oss-20b, llama-3.1-8b-instant, llama3)",
+        help=(
+            "Model override (default Groq: openai/gpt-oss-20b; e.g. llama3 for Ollama)"
+        ),
     )
     parser.add_argument(
         "--auto",

@@ -1,5 +1,7 @@
 # Video demonstration
 
+**Step-by-step shot list, prompts, and pacing:** [VIDEO_DEMO_GUIDE.md](VIDEO_DEMO_GUIDE.md)
+
 ## Checklist (rubric)
 
 Record a screen capture that clearly shows:

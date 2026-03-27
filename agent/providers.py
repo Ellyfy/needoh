@@ -65,9 +65,10 @@ class GroqProvider(BaseProvider):
     Groq offers very fast inference with Llama 3 and other open models.
     Get a free API key at: https://console.groq.com
 
-    Default model is openai/gpt-oss-20b (Groq production). llama-3.1-70b-versatile was
-    decommissioned; llama-3.3-70b-versatile may still hit tool_use_failed (XML tools).
-    Override via DEFAULT_GROQ_MODEL (e.g. llama-3.1-8b-instant, openai/gpt-oss-120b).
+    Default model is openai/gpt-oss-20b: Groq-compatible tool-call JSON. Llama 4 Scout and some
+    Llama instants emit invalid shapes (e.g. a "parameters" wrapper) and return tool_use_failed.
+    TPM is lower (~8K) than Scout; Needoh truncates long tool results in history
+    (NEEDOH_TOOL_OUTPUT_MAX_CHARS) to reduce 413 errors. Override via DEFAULT_GROQ_MODEL.
     """
 
     name = "groq"
