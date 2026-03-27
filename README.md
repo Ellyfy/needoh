@@ -1,3 +1,4 @@
+Shailesh Kumar
 # 🔩 Needoh — Autonomous CLI Coding Assistant
 
 > *"Give it a task. Walk away."*
@@ -5,6 +6,12 @@
 Needoh is an autonomous AI coding assistant that lives in your terminal. You describe a task in plain English; Needoh reasons about your codebase, reads and writes files, runs commands, searches the web, queries documentation, and keeps iterating until the job is done.
 
 ---
+
+## Course submission helpers
+
+- **[Submission checklist (rubric map)](docs/SUBMISSION_CHECKLIST.md)** — verify requirements vs. this repo  
+- **[Demo & test prompts](docs/DEMO_TEST_PROMPTS.md)** — what to ask during QA and video recording  
+- **[Diagrams folder](docs/diagrams/README.md)** — where to put state/sequence PNG exports  
 
 ## Features
 
@@ -14,7 +21,7 @@ Needoh is an autonomous AI coding assistant that lives in your terminal. You des
 - **Provider abstraction** — swap between Groq (cloud) and Ollama (local) via a flag
 - **Confirm / auto mode** — choose whether Needoh asks before executing commands
 - **Custom RAG server** — queries LangChain docs via HyDE-enhanced retrieval
-- **Streaming output** — live token-by-token responses with Rich UI
+- **Streaming-style output** — assistant text prints in word chunks each turn (Groq uses non-streaming API when tools are bound for reliable tool calls)
 
 ---
 
@@ -44,6 +51,8 @@ Developer → Needoh CLI (REPL)
 See our complete planning documentation in [`docs/planning/architecture_v1.md`](docs/planning/architecture_v1.md).
 
 ### State Diagram
+
+**Add your exported PNG** to [`docs/diagrams/`](docs/diagrams/README.md) (see that folder for naming).
 
 ![State Diagram](docs/diagrams/State_Diagram.png)
 
@@ -111,15 +120,18 @@ python rag_server/ingest.py
 This downloads and embeds the LangChain documentation into a local ChromaDB vector store. Only needs to be run once.
 
 ### 5. Run Needoh
+
+Always run from this folder (the one that contains `main.py`). If imports fail, see [docs/DEMO_TEST_PROMPTS.md](docs/DEMO_TEST_PROMPTS.md) (troubleshooting at the top).
+
 ```bash
 # Default (Groq, confirm mode)
-python -m needoh.main
+python main.py
 
 # Use Ollama
-python -m needoh.main --provider ollama --model llama3
+python main.py --provider ollama --model llama3
 
 # Auto-execute mode (no confirmation prompts)
-python -m needoh.main --auto
+python main.py --auto
 ```
 
 ---
@@ -172,7 +184,17 @@ Query: "how do I add memory to a LangChain agent?"
 
 ## Project Structure
 ```
-needoh/
+needoh/                         # repository root
+├── main.py                     # CLI entrypoint & REPL
+├── agent/
+│   ├── loop.py                 # Agentic loop
+│   ├── providers.py            # LLM provider abstraction
+│   └── tools.py                # Local shell tools
+├── mcpclient/
+│   ├── client.py               # MCP client
+│   └── config.py               # Server configurations
+├── ui/
+│   └── display.py              # Rich terminal rendering
 ├── README.md
 ├── requirements.txt
 ├── .env.example
@@ -180,27 +202,12 @@ needoh/
 │   ├── planning/
 │   │   └── architecture_v1.md
 │   ├── diagrams/
-│   │   ├── State_Diagram.png
-│   │   ├── Sequence_Diagram_RAG_Query.png
-│   │   ├── Sequence_diagram_File_read_Edit.png
-│   │   └── Sequence_Diagram_ web_search.png
 │   └── reflection.md
-├── needoh/
-│   ├── main.py              # CLI entrypoint & REPL
-│   ├── agent/
-│   │   ├── loop.py          # Agentic loop
-│   │   ├── providers.py     # LLM provider abstraction
-│   │   └── tools.py         # Tool call dispatcher
-│   ├── mcpclient/
-│   │   ├── client.py        # MCP client
-│   │   └── config.py        # Server configurations
-│   └── ui/
-│       └── display.py       # Rich terminal rendering
 └── rag_server/
-    ├── server.py            # MCP RAG server
-    ├── ingest.py            # One-time doc ingestion
-    ├── retriever.py         # HyDE retrieval logic
-    └── chroma_store/        # Persisted vector DB (gitignored)
+    ├── server.py               # MCP RAG server
+    ├── ingest.py               # One-time doc ingestion
+    ├── retriever.py            # HyDE retrieval logic
+    └── chroma_store/           # Persisted vector DB (gitignored)
 ```
 
 ---

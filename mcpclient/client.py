@@ -19,8 +19,8 @@ from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from needoh.mcpclient.config import SERVERS
-from needoh.ui.display import console, print_info, print_error, DIM
+from mcpclient.config import build_servers
+from ui.display import console, print_info, print_error, DIM
 
 
 class NeedohMCPClient:
@@ -53,7 +53,7 @@ class NeedohMCPClient:
 
     async def _connect_all(self) -> None:
         """Start all MCP servers and load their tools."""
-        for cfg in SERVERS:
+        for cfg in build_servers():
             try:
                 await self._connect_server(cfg)
             except Exception as exc:

@@ -1,11 +1,11 @@
 """
-needoh/main.py
-CLI entrypoint and REPL for Needoh.
+main.py
+CLI entrypoint and REPL for Needoh (run from repository root).
 
 Usage:
-    python -m needoh.main
-    python -m needoh.main --provider ollama --model llama3
-    python -m needoh.main --auto
+    python main.py
+    python main.py --provider ollama --model llama3
+    python main.py --auto
 """
 
 from __future__ import annotations
@@ -14,6 +14,13 @@ import argparse
 import asyncio
 import os
 import sys
+from pathlib import Path
+
+# Repo root on sys.path so agent/mcpclient/ui import even if cwd differs
+_REPO_ROOT = Path(__file__).resolve().parent
+_rp = str(_REPO_ROOT)
+if _rp not in sys.path:
+    sys.path.insert(0, _rp)
 
 from dotenv import load_dotenv
 from prompt_toolkit import PromptSession
@@ -23,10 +30,10 @@ from prompt_toolkit.styles import Style
 # Load .env before importing anything that reads env vars
 load_dotenv()
 
-from needoh.agent.loop import AgentLoop
-from needoh.agent.providers import get_provider
-from needoh.mcpclient.client import NeedohMCPClient
-from needoh.ui.display import (
+from agent.loop import AgentLoop
+from agent.providers import get_provider
+from mcpclient.client import NeedohMCPClient
+from ui.display import (
     console,
     print_banner,
     print_error,
@@ -206,7 +213,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         default=None,
-        help="Model name override (e.g. llama-3.3-70b-versatile, llama3)",
+        help="Model name override (e.g. openai/gpt-oss-20b, llama-3.1-8b-instant, llama3)",
     )
     parser.add_argument(
         "--auto",

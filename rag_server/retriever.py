@@ -124,7 +124,7 @@ class HyDERetriever:
         if groq_key:
             from langchain_groq import ChatGroq
             return ChatGroq(
-                model=os.getenv("DEFAULT_GROQ_MODEL", "llama-3.3-70b-versatile"),
+                model=os.getenv("DEFAULT_GROQ_MODEL", "openai/gpt-oss-20b"),
                 api_key=groq_key,
                 temperature=0.3,   # slight creativity for hypothetical writing
                 max_tokens=400,

@@ -101,7 +101,11 @@ def print_confirm_prompt(tool_name: str, args: dict) -> bool:
     """
     print_tool_call(tool_name, args)
     console.print(f"  [{ACCENT}]Execute this tool? [y/N][/] ", end="")
-    answer = input().strip().lower()
+    try:
+        answer = input().strip().lower()
+    except EOFError:
+        console.print()
+        return False
     return answer in ("y", "yes")
 
 

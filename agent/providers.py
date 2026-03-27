@@ -64,12 +64,16 @@ class GroqProvider(BaseProvider):
     Cloud LLM via Groq API.
     Groq offers very fast inference with Llama 3 and other open models.
     Get a free API key at: https://console.groq.com
+
+    Default model is openai/gpt-oss-20b (Groq production). llama-3.1-70b-versatile was
+    decommissioned; llama-3.3-70b-versatile may still hit tool_use_failed (XML tools).
+    Override via DEFAULT_GROQ_MODEL (e.g. llama-3.1-8b-instant, openai/gpt-oss-120b).
     """
 
     name = "groq"
 
     def __init__(self, model: str | None = None):
-        self.model = model or os.getenv("DEFAULT_GROQ_MODEL", "llama-3.3-70b-versatile")
+        self.model = model or os.getenv("DEFAULT_GROQ_MODEL", "openai/gpt-oss-20b")
         self._api_key = os.getenv("GROQ_API_KEY")
         if not self._api_key:
             raise ValueError(
@@ -80,11 +84,15 @@ class GroqProvider(BaseProvider):
     def get_llm(self, tools: list[dict] | None = None) -> BaseChatModel:
         from langchain_groq import ChatGroq
 
+        # Groq: invoke() with bind_tools + streaming=True uses the SSE API and often
+        # raises APIError("Failed to call a function..."). Non-streaming create() is
+        # stable for tool calls. Plain (no tools) keeps streaming for provider.stream().
+        use_stream = tools is None
         llm = ChatGroq(
             model=self.model,
             api_key=self._api_key,
             temperature=0,
-            streaming=True,
+            streaming=use_stream,
         )
         if tools:
             return llm.bind_tools(tools)

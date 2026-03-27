@@ -28,7 +28,7 @@ Continues until the model stops requesting tools or a max-iteration limit is hit
 ### 3. Provider Abstraction (`needoh/agent/providers.py`)
 Abstract base class `BaseProvider` with `chat()` method.
 Implementations:
-- `GroqProvider` — uses langchain-groq, default model: llama-3.3-70b-versatile
+- `GroqProvider` — uses langchain-groq, default model: openai/gpt-oss-20b
 - `OllamaProvider` — uses langchain-ollama for local inference
 
 Switch via CLI flag: `--provider groq` or `--provider ollama`
