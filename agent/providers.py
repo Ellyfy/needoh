@@ -17,8 +17,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Iterator
 
 from langchain_core.messages import BaseMessage
-from langchain_core.language_models import BaseChatModel
-
+try:
+    from langchain_core.language_models import BaseChatModel
+except Exception:
+    BaseChatModel = None
+    
 
 class BaseProvider(ABC):
     """Abstract base class for LLM providers."""
