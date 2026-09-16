@@ -10,8 +10,8 @@ langchain-groq>=0.2.0
 langchain-ollama>=0.2.0
 langchain-core>=0.3.0
 
-# MCP client
-mcp>=1.0.0
+# MCP client (pin to 1.x: 2.x renamed Server.list_tools/Tool.inputSchema and breaks mcpclient/rag_server)
+mcp>=1.0.0,<2.0.0
 
 # RAG / embeddings
 langchain-community>=0.3.0
